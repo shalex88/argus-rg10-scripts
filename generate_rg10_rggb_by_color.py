@@ -6,7 +6,7 @@ Generates a solid color RG10 RGGB binary image using generate_rg10_rggb.py.
 import sys
 import subprocess
 
-GENERATOR = 'generate_rg10_rggb_binary.py'
+GENERATOR = 'generate_rg10_rggb_file.py'
 
 COLOR_MAP = {
     'grey':   (512, 512, 512),
@@ -20,7 +20,7 @@ COLOR_MAP = {
     'magenta':(1023, 0, 1023),
 }
 
-USAGE = "Usage: python {GENERATOR} <color> <width> <height>"
+USAGE = f"Usage: python {sys.argv[0]} <color> <width> <height>"
 
 def main():
     if len(sys.argv) != 4:
@@ -36,7 +36,7 @@ def main():
     outfile = f"{color}.rggb.raw"
     mode = "binary"  # Always binary for this script
     # Delegate to the Python RGGB generator
-    cmd = [sys.executable, GENERATOR, str(r), str(g), str(b), width, height, mode, outfile]
+    cmd = [sys.executable, GENERATOR, str(r), str(g), str(b), width, height, outfile]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
