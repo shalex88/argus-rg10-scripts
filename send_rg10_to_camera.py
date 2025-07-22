@@ -64,7 +64,7 @@ def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
 def setup():
     print(f"Setting up")
     # Any additional setup can be done here if needed
-    cmd = [sys.executable, "rmmod" , "li_imx477"]
+    cmd = ["sudo", "rmmod", "li_imx477"]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -74,14 +74,14 @@ def setup():
 def clear():
     print(f"Clearing")
     # Any additional cleanup can be done here if needed
-    cmd = [sys.executable, "modprobe" , "li_imx477"]
+    cmd = ["sudo", "modprobe", "li_imx477"]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error : {e}")
         sys.exit(1)
 
-    cmd = [sys.executable, "systemctl" , "restart", "nvargus-daemon"]
+    cmd = ["sudo", "systemctl", "restart", "nvargus-daemon"]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -89,12 +89,20 @@ def clear():
         sys.exit(1)
 
 def show():
-    cmd = [sys.executable, "gst-launch-1.0" , "nvaguscamerasrc", "sensor-id=1", "sensor-mode=0", "!", "nv3dsink"]
+    cmd = ["gst-launch-1.0", "nvarguscamerasrc", "sensor-id=1", "sensor-mode=0", "!", "fakesink"] #nv3dsink
+    process = None
     try:
-        subprocess.run(cmd, check=True)
+        process = subprocess.Popen(cmd)
+        process.wait()
+    except KeyboardInterrupt:
+        print("\nStopping camera preview...")
     except subprocess.CalledProcessError as e:
         print(f"Error : {e}")
         sys.exit(1)
+    finally:
+        if process:
+            process.terminate()
+            process.wait()
 
 def main():
     if len(sys.argv) != 4:
