@@ -46,6 +46,7 @@ def write_i2c(bus, lsb, msb, reg_lsb_addr):
         bus.write_byte_data(I2C_ADDR, reg_lsb_addr + 1, msb)
     except Exception as e:
         print(f"Failed to write to I2C: {e}")
+        raise  # Re-raise the exception to be handled by caller
 
 
 def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
@@ -53,26 +54,31 @@ def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
     print(f"Attempting to write values to camera via I2C:")
     try:
         with SMBus(I2C_BUS) as bus:
+            # Add a small delay between writes to ensure proper I2C timing
             write_i2c(bus, r_bytes[0], r_bytes[1], REG_R_LSB_ADDR)
             write_i2c(bus, g1_bytes[0], g1_bytes[1], REG_G1_LSB_ADDR)
             write_i2c(bus, g2_bytes[0], g2_bytes[1], REG_G2_LSB_ADDR)
             write_i2c(bus, b_bytes[0], b_bytes[1], REG_B_LSB_ADDR)
         print("Complete: RGB values written to camera registers")
     except Exception as e:
-        print(f"Failed to write to I2C: {e}")
+        raise
 
 def setup():
     print(f"Setting up")
     # Any additional setup can be done here if needed
     cmd = ["sudo", "rmmod", "li_imx477"]
     try:
-        subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error : {e}")
-        sys.exit(1)
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        if "not currently loaded" in error_msg:
+            print("Module li_imx477 is already unloaded")
+        else:
+            print(f"Warning: {error_msg}")
+            sys.exit(1)
 
-def clear():
-    print(f"Clearing")
+def cleanup():
+    print(f"Cleaning up")
     # Any additional cleanup can be done here if needed
     cmd = ["sudo", "modprobe", "li_imx477"]
     try:
@@ -89,7 +95,7 @@ def clear():
         sys.exit(1)
 
 def show():
-    cmd = ["gst-launch-1.0", "nvarguscamerasrc", "sensor-id=1", "sensor-mode=0", "!", "fakesink"] #nv3dsink
+    cmd = ["gst-launch-1.0", "nvarguscamerasrc", "sensor-id=1", "sensor-mode=0", "!", "nv3dsink"]
     process = None
     try:
         process = subprocess.Popen(cmd)
@@ -132,7 +138,7 @@ def main():
     try:
         setup()
 
-        print(f"Preparing values for I2C bus {I2C_BUS}, device address 0x{I2C_ADDR:02x}:")
+        print(f"Writing values for I2C bus {I2C_BUS}, device address 0x{I2C_ADDR:02x}:")
         # Pass pre-converted bytes to send_to_camera
         send_to_camera(
             (r_lsb, r_msb),
@@ -141,10 +147,10 @@ def main():
             (b_lsb, b_msb)
         )
 
-        clear()
+        cleanup()
         show()
     except Exception as e:
-        print(f"Error communicating with camera via I2C: {e}")
+        cleanup()
         sys.exit(1)
 
 
