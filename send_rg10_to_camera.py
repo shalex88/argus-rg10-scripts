@@ -4,6 +4,7 @@ Send RGB values to camera via I2C in RG10 format.
 Usage: python send_rg10_to_camera.py <R> <G> <B>
 """
 import sys
+import subprocess
 from smbus2 import SMBus
 
 I2C_BUS = 2
@@ -49,7 +50,7 @@ def write_i2c(bus, lsb, msb, reg_lsb_addr):
 
 def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
     """Send pre-converted RGB values to camera via I2C."""
-    print(f"\nAttempting to write values to camera via I2C:")
+    print(f"Attempting to write values to camera via I2C:")
     try:
         with SMBus(I2C_BUS) as bus:
             write_i2c(bus, r_bytes[0], r_bytes[1], REG_R_LSB_ADDR)
@@ -60,6 +61,40 @@ def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
     except Exception as e:
         print(f"Failed to write to I2C: {e}")
 
+def setup():
+    print(f"Setting up")
+    # Any additional setup can be done here if needed
+    cmd = [sys.executable, "rmmod" , "li_imx477"]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error : {e}")
+        sys.exit(1)
+
+def clear():
+    print(f"Clearing")
+    # Any additional cleanup can be done here if needed
+    cmd = [sys.executable, "modprobe" , "li_imx477"]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error : {e}")
+        sys.exit(1)
+
+    cmd = [sys.executable, "systemctl" , "restart", "nvargus-daemon"]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error : {e}")
+        sys.exit(1)
+
+def show():
+    cmd = [sys.executable, "gst-launch-1.0" , "nvaguscamerasrc", "sensor-id=1", "sensor-mode=0", "!", "nv3dsink"]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error : {e}")
+        sys.exit(1)
 
 def main():
     if len(sys.argv) != 4:
@@ -86,9 +121,10 @@ def main():
     log_register_write(g, REG_G2_LSB_ADDR, g_lsb, g_msb)
     log_register_write(b, REG_B_LSB_ADDR, b_lsb, b_msb)
 
-    print(f"Preparing values for I2C bus {I2C_BUS}, device address 0x{I2C_ADDR:02x}:")
-
     try:
+        setup()
+
+        print(f"Preparing values for I2C bus {I2C_BUS}, device address 0x{I2C_ADDR:02x}:")
         # Pass pre-converted bytes to send_to_camera
         send_to_camera(
             (r_lsb, r_msb),
@@ -96,6 +132,9 @@ def main():
             (g_lsb, g_msb),
             (b_lsb, b_msb)
         )
+
+        clear()
+        show()
     except Exception as e:
         print(f"Error communicating with camera via I2C: {e}")
         sys.exit(1)
