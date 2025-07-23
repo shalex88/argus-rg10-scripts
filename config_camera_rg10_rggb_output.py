@@ -5,10 +5,12 @@ Usage: python send_rg10_to_camera.py <R> <G> <B>
 """
 import sys
 import subprocess
+from time import sleep
 from smbus2 import SMBus
 
 I2C_BUS = 2
 I2C_ADDR = 0x10
+REG_ENABLE_TEST_PATTERN = 0x600
 REG_R_LSB_ADDR = 0x602
 REG_G1_LSB_ADDR = 0x604
 REG_G2_LSB_ADDR = 0x606
@@ -56,9 +58,13 @@ def send_to_camera(r_bytes, g1_bytes, g2_bytes, b_bytes):
         with SMBus(I2C_BUS) as bus:
             # Add a small delay between writes to ensure proper I2C timing
             write_i2c(bus, r_bytes[0], r_bytes[1], REG_R_LSB_ADDR)
+            sleep(0.1)
             write_i2c(bus, g1_bytes[0], g1_bytes[1], REG_G1_LSB_ADDR)
+            sleep(0.1)
             write_i2c(bus, g2_bytes[0], g2_bytes[1], REG_G2_LSB_ADDR)
+            sleep(0.1)
             write_i2c(bus, b_bytes[0], b_bytes[1], REG_B_LSB_ADDR)
+            sleep(0.1)
         print("Complete: RGB values written to camera registers")
     except Exception as e:
         raise
@@ -76,6 +82,14 @@ def setup():
         else:
             print(f"Warning: {error_msg}")
             sys.exit(1)
+
+    try:
+        with SMBus(I2C_BUS) as bus:
+            sleep(0.1)  # Ensure bus is ready
+            write_i2c(bus, 0x1, 0x0, REG_ENABLE_TEST_PATTERN)
+        print("Complete: Enable test pattern")
+    except Exception as e:
+        raise
 
 def cleanup():
     print(f"Cleaning up")
@@ -139,6 +153,7 @@ def main():
         setup()
 
         print(f"Writing values for I2C bus {I2C_BUS}, device address 0x{I2C_ADDR:02x}:")
+        send_to_camera(0,1)
         # Pass pre-converted bytes to send_to_camera
         send_to_camera(
             (r_lsb, r_msb),
@@ -148,6 +163,7 @@ def main():
         )
 
         cleanup()
+        sleep(1)
         show()
     except Exception as e:
         cleanup()
