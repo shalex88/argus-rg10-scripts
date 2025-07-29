@@ -142,10 +142,10 @@ def convert_rgb_array_scaled_16bit(rgb_array: np.ndarray) -> np.ndarray:
     # Vectorized conversion: (value * 1023 + 127) // 255
     # Use int32 to avoid overflow
     result = ((rgb_array.astype(np.int32) * 1023 + 127) // 255)
-
+    
     # Scale by 16 (left shift by 4 bits) and ensure it fits in 16-bit
     result_scaled = (result << 4) & 0xFFFF
-
+    
     return result_scaled.astype(np.uint16)
 
 def convert_rgb_list_16bit(rgb_list: List[Tuple[int, int, int]]) -> List[Tuple[int, int, int]]:
@@ -247,14 +247,14 @@ def display_register_map(rgb_values_8bit: Tuple[int, int, int], scaled: bool = F
         scaled: Whether to show scaled (16x) version
     """
     r8, g8, b8 = rgb_values_8bit
-
+    
     if scaled:
         r16, g16, b16 = convert_rgb_pixel_scaled_16bit(r8, g8, b8)
         print(f"\n=== RGB Register Mapping (16x Scaled) ===")
     else:
         r16, g16, b16 = convert_rgb_pixel_16bit(r8, g8, b8)
         print(f"\n=== RGB Register Mapping ===")
-
+    
     print(f"Input 8-bit RGB: ({r8}, {g8}, {b8}) = (0x{r8:02X}, 0x{g8:02X}, 0x{b8:02X})")
     print(f"Output 16-bit registers: ({r16}, {g16}, {b16}) = (0x{r16:04X}, 0x{g16:04X}, 0x{b16:04X})")
 
@@ -283,6 +283,12 @@ def test_conversion_16bit():
     print(f"0x80 -> 0x{convert_8bit_to_10bit_scaled_16bit(0x80):04X} (expected 0x2000)")
     print(f"0xFF -> 0x{convert_8bit_to_10bit_scaled_16bit(0xFF):04X} (expected 0x3FF0)")
 
+    print(f"\nMaximum values check:")
+    print(f"10-bit max: 0x{1023:04X} (0x03FF)")
+    print(f"Scaled max: 0x{1023*16:04X} (0x3FF0)")
+    print(f"Register bit mask (unscaled): 0x{0x03FF:04X}")
+    print(f"Register bit mask (scaled): 0x{0xFFFF:04X}")
+
     print("\nTesting intermediate values:")
     test_values = [0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xE0, 0xFF]
     print("Value | Unscaled | Scaled")
@@ -291,6 +297,22 @@ def test_conversion_16bit():
         result = convert_8bit_to_10bit_16bit(val)
         result_scaled = convert_8bit_to_10bit_scaled_16bit(val)
         print(f"0x{val:02X}  |  0x{result:04X}   | 0x{result_scaled:04X}")
+
+def compare_methods_16bit():
+    """Compare different conversion methods for accuracy (16-bit format)."""
+    print("\nComparing conversion methods (16-bit register format):")
+    print("Value | Math  | Shift | LUT   | Math*16 | Shift*16 | LUT*16")
+    print("------|-------|-------|-------|---------|----------|--------")
+
+    test_values = [0x00, 0x80, 0xFF, 0x40, 0xC0]
+    for val in test_values:
+        math_result = convert_8bit_to_10bit_16bit(val)
+        shift_result = convert_8bit_to_10bit_bitshift_16bit(val)
+        lut_result = convert_8bit_to_10bit_lut_16bit(val)
+        math_scaled = convert_8bit_to_10bit_scaled_16bit(val)
+        shift_scaled = convert_8bit_to_10bit_bitshift_scaled_16bit(val)
+        lut_scaled = convert_8bit_to_10bit_lut_scaled_16bit(val)
+        print(f"0x{val:02X}  | 0x{math_result:04X} | 0x{shift_result:04X} | 0x{lut_result:04X} |  0x{math_scaled:04X}  |  0x{shift_scaled:04X}   | 0x{lut_scaled:04X}")
 
 def demo_image_conversion_16bit():
     """Demonstrate image conversion using NumPy with 16-bit register format."""
@@ -308,10 +330,10 @@ def demo_image_conversion_16bit():
 
     converted_image = convert_rgb_array_16bit(sample_image)
     converted_image_scaled = convert_rgb_array_scaled_16bit(sample_image)
-
+    
     print(f"\nConverted 10-bit image (in 16-bit registers):")
     print(converted_image)
-
+    
     print(f"\nConverted 10-bit image with 16x scaling (in 16-bit registers):")
     print(converted_image_scaled)
 
@@ -323,7 +345,7 @@ def demo_image_conversion_16bit():
             pixel_hex = [f"0x{val:04X}" for val in converted_image[i, j]]
             row_hex.append(f"[{', '.join(pixel_hex)}]")
         print(f"  {', '.join(row_hex)}")
-
+    
     print(f"\nConverted image (hexadecimal, 16x scaled):")
     for i in range(converted_image_scaled.shape[0]):
         row_hex = []
@@ -331,6 +353,13 @@ def demo_image_conversion_16bit():
             pixel_hex = [f"0x{val:04X}" for val in converted_image_scaled[i, j]]
             row_hex.append(f"[{', '.join(pixel_hex)}]")
         print(f"  {', '.join(row_hex)}")
+
+    print(f"\nImage shape: {sample_image.shape}")
+    print(f"Original dtype: {sample_image.dtype}, range: {sample_image.min()}-{sample_image.max()}")
+    print(f"Converted dtype: {converted_image.dtype}, range: {converted_image.min()}-{converted_image.max()}")
+    print(f"Scaled dtype: {converted_image_scaled.dtype}, range: {converted_image_scaled.min()}-{converted_image_scaled.max()}")
+    print(f"Register format (unscaled): 16-bit with 10-bit data (max value: 0x{converted_image.max():04X})")
+    print(f"Register format (scaled): 16-bit with scaled 10-bit data (max value: 0x{converted_image_scaled.max():04X})")
 
 def demo_register_analysis():
     """Demonstrate register format analysis."""
@@ -352,5 +381,6 @@ def demo_register_analysis():
 
 if __name__ == "__main__":
     test_conversion_16bit()
-    demo_image_conversion_16bit()
+    compare_methods_16bit()
+    #demo_image_conversion_16bit()
     #demo_register_analysis()
